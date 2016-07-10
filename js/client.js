@@ -35,7 +35,7 @@ function draw() {
 
 function setupSVG(width, height) {
   //Give to svg the same size as the image
-  svg.setAttribute('viewport', '0 0 '+width+' '+height);
+  svg.setAttribute('viewBox', '0 0 '+width+' '+height);
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
 }

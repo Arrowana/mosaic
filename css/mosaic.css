@@ -11,14 +11,6 @@ img {
     display: none;
 }
 
-#wrapper {
-    width: 100%;
-}
-
-svg {
-    background: yellow;
-}
-
 .svg-container { 
     display: inline-block;
     position: relative;
@@ -26,4 +18,14 @@ svg {
     padding-bottom: 100%; 
     vertical-align: middle; 
     overflow: hidden; 
+    margin: 0;
+
+    background: yellow;
+}
+
+.svg-content { 
+    display: inline-block;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
