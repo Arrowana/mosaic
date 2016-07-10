@@ -1,3 +1,6 @@
+/*
+  UI code elements    
+*/
 
 document.body.addEventListener('dragenter', dragenter, false);
 document.body.addEventListener('drop', drop, false);
@@ -33,7 +36,7 @@ toggleButton.addEventListener('mouseleave', function(e){
 });
 
 //Load file from input
-function loadFile(){
+function loadFile() {
   var imageFile = this.files[0];
   handleFile(imageFile);
 }
@@ -48,4 +51,3 @@ function handleFile(imageFile) {
 
   reader.readAsDataURL(imageFile);
 }
-
