@@ -23,15 +23,18 @@ function dragover(e) {
   e.preventDefault();
 }
 
+var container = document.getElementById('svg-container');
 var toggleButton = document.getElementById('toggle');
 
 toggleButton.addEventListener('mouseenter', function(e){
     console.log(e);
+    container.style.display = 'none';
     img.classList.remove('hidden');
 });
 
 toggleButton.addEventListener('mouseleave', function(e){
     console.log(e);
+    container.style.display = 'inline-block';
     img.classList.add('hidden');
 });
 

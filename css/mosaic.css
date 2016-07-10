@@ -9,9 +9,10 @@ img {
 
 .hidden {
     display: none;
+    visibility: hidden;
 }
 
-.svg-container { 
+#svg-container { 
     display: inline-block;
     position: relative;
     width: 100%;
@@ -19,8 +20,6 @@ img {
     vertical-align: middle; 
     overflow: hidden; 
     margin: 0;
-
-    background: yellow;
 }
 
 .svg-content { 

@@ -10,6 +10,10 @@ inputElement.addEventListener('change', loadFile, false);
 //Draw image in context to get pixels
 function draw() {
   var t0 = performance.now();
+
+  //Remove children of svg to eventually delete previous tiles
+  svg.innerHTML = '';
+
   console.log(this);
   var canvas = document.createElement('canvas');
   var context = canvas.getContext('2d');
