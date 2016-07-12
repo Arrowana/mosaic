@@ -7,10 +7,9 @@ var svg = document.getElementById('output-svg');
 var inputElement = document.getElementById('input-file');
 inputElement.addEventListener('change', loadFile, false);
 
-var mosaic;
 var t0;
 
-//Draw image in context to get pixels
+//Draw image in context to get pixels and generate mosaic
 function draw() {
   t0 = performance.now();
 
@@ -53,9 +52,19 @@ var Mosaic = function(width, height, context) {
   //Tile row index
   this.rowIndex = 0;
 
-  //this.processRow(this.rowIndex);
-  this.generateMosaicSequential();
+  var forceSequential = false;
+  if(window.Worker && !forceSequential) {
+    this.processRow(this.rowIndex);
+  }
+  else {
+    this.generateMosaicSequential();
+    showPerf();
+  }
 };
+
+function showPerf() {
+    console.log('Finished mosaic generation in: '+(performance.now()-t0)+' ms');
+}
 
 //Loop over each tile to create the mosaic
 Mosaic.prototype.generateMosaicSequential = function() {
@@ -64,16 +73,13 @@ Mosaic.prototype.generateMosaicSequential = function() {
     for(var i = 0; i < this.columns; i++) {
       var averages = getAverages(this.getTileData(i, j));
       console.log('Average tile: '+averages);
-
-      svg.appendChild(createTile(averages, i*TILE_WIDTH, j*TILE_HEIGHT));
+      showPerf();
     }
   }
 };
 
 Mosaic.prototype.finishRow = function(tilesAverage) {
   for(var i = 0; i < this.columns; i++) {
-    //console.log(tilesAverage);
-    //console.log('Average tile: '+averages);
     //svg.appendChild(createTile(averages, i, j));
   }
 
@@ -87,15 +93,15 @@ Mosaic.prototype.finishRow = function(tilesAverage) {
   }
 };
 
-Mosaic.prototype.getTileData = function(row, column) {
+Mosaic.prototype.getTileData = function(column, row) {
   return this.context.getImageData(column*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT).data;
 };
 
 Mosaic.prototype.processRow = function(rowIndex) {
   var maxWorkers = navigator.hardwareConcurrency || 4;
-  var totalWorkers = 250;
-
+  var workers = [];
   var workerIndex = 0;
+
   var columnIndex = 0;
 
   var mosaic = this;
@@ -131,8 +137,6 @@ Mosaic.prototype.processRow = function(rowIndex) {
     var tileData = mosaic.getTileData(rowIndex, columnIndex);
     worker.postMessage(tileData);
   }
-
-  var workers = [];
 
   //Start as many workers as cores available
   for(var i = 0; i < maxWorkers; i++) { 
