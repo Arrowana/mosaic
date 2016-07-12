@@ -7,9 +7,12 @@ var svg = document.getElementById('output-svg');
 var inputElement = document.getElementById('input-file');
 inputElement.addEventListener('change', loadFile, false);
 
+var mosaic;
+var t0;
+
 //Draw image in context to get pixels
 function draw() {
-  var t0 = performance.now();
+  t0 = performance.now();
 
   //Remove children of svg to eventually delete previous tiles
   svg.innerHTML = '';
@@ -27,14 +30,7 @@ function draw() {
   //Draw image in context to be able to read pixels
   context.drawImage(this, 0, 0);
 
-  //Find number of columns and rows
-  var columns = Math.floor(this.width/TILE_WIDTH);
-  var rows = Math.floor(this.height/TILE_HEIGHT);
-
-  console.log(['columns:', columns, 'rows:',rows].join(' '));
-  generateMosaic(rows, columns, context);
-
-  console.log('Finished mosaic generation in: '+(performance.now()-t0)+' ms');
+  var mosaic = new Mosaic(this.width, this.height, context);
 }
 
 function setupSVG(width, height) {
@@ -44,18 +40,108 @@ function setupSVG(width, height) {
   svg.setAttribute('height', '100%');
 }
 
+//
+var Mosaic = function(width, height, context) {
+  //Find number of columns and rows
+  this.columns = Math.floor(width/TILE_WIDTH);
+  this.rows = Math.floor(height/TILE_HEIGHT);
+
+  console.log(['columns:', this.columns, 'rows:', this.rows].join(' '));
+
+  this.context = context;
+
+  //Tile row index
+  this.rowIndex = 0;
+
+  //this.processRow(this.rowIndex);
+  this.generateMosaicSequential();
+};
+
 //Loop over each tile to create the mosaic
-function generateMosaic(rows, columns, context) {
-  for(var j = 0; j < rows*TILE_HEIGHT; j+=TILE_HEIGHT) {
+Mosaic.prototype.generateMosaicSequential = function() {
+  for(var j = 0; j < this.rows; j++) {
     //Iterate over each column
-    for(var i = 0; i < columns*TILE_WIDTH; i+=TILE_WIDTH) {
-      var averages = getAverages(context.getImageData(i, j, TILE_WIDTH, TILE_HEIGHT).data);
+    for(var i = 0; i < this.columns; i++) {
+      var averages = getAverages(this.getTileData(i, j));
       console.log('Average tile: '+averages);
 
-      svg.appendChild(createTile(averages, i, j));
+      svg.appendChild(createTile(averages, i*TILE_WIDTH, j*TILE_HEIGHT));
     }
   }
-}
+};
+
+Mosaic.prototype.finishRow = function(tilesAverage) {
+  for(var i = 0; i < this.columns; i++) {
+    //console.log(tilesAverage);
+    //console.log('Average tile: '+averages);
+    //svg.appendChild(createTile(averages, i, j));
+  }
+
+  this.rowIndex++;
+  if(this.rowIndex < this.rows) {
+    this.processRow(this.rowIndex);
+  }
+  else {
+    console.log('Mosaic computation finished');
+    console.log('Finished mosaic generation in: '+(performance.now()-t0)+' ms');
+  }
+};
+
+Mosaic.prototype.getTileData = function(row, column) {
+  return this.context.getImageData(column*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT).data;
+};
+
+Mosaic.prototype.processRow = function(rowIndex) {
+  var maxWorkers = navigator.hardwareConcurrency || 4;
+  var totalWorkers = 250;
+
+  var workerIndex = 0;
+  var columnIndex = 0;
+
+  var mosaic = this;
+  var tilesAverage = [];
+  
+  function runWorker(worker) {
+    worker.onmessage = function(event) {
+      tilesAverage.push(event.data);
+
+      columnIndex++;
+      if(columnIndex < mosaic.columns) {
+        runWorker(worker);
+      }
+      else {
+        worker.terminate();
+        worker.finished = true;
+
+        //Returns if some worker are still running
+        for(var i = 0; i < workers.length; i++) {
+          if (!workers[i].finished) {
+              return;
+          }
+        }
+
+        console.log('Computation on row '+rowIndex+' finished'); 
+        mosaic.finishRow(tilesAverage);
+      }
+    };
+
+    workerIndex++;
+
+    //Send payload to worker to do the computation
+    var tileData = mosaic.getTileData(rowIndex, columnIndex);
+    worker.postMessage(tileData);
+  }
+
+  var workers = [];
+
+  //Start as many workers as cores available
+  for(var i = 0; i < maxWorkers; i++) { 
+    var worker = new Worker('js/worker.js');
+    workers.push(worker);
+
+    runWorker(worker);
+  }
+};
 
 //Generate tile given rgbArray, position and tile specs
 function createTile(rgbArray, i, j) {
