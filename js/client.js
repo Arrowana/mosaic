@@ -1,38 +1,43 @@
-//Don't forget to move the import of client.js to the top
-var img = document.getElementById('my-image');
-img.onload = draw;
+/*
 
-var svg = document.getElementById('output-svg');
+*/
 
-var inputElement = document.getElementById('input-file');
-inputElement.addEventListener('change', loadFile, false);
+document.addEventListener('DOMContentLoaded', load);
 
-var t0;
+function load() {
+  var img = document.getElementById('my-image');
+  img.onload = draw;
+
+  var inputElement = document.getElementById('input-file');
+  inputElement.addEventListener('change', loadFile, false);
+}
 
 //Draw image in context to get pixels and generate mosaic
 function draw() {
   t0 = performance.now();
 
+  var svg = document.getElementById('output-svg');
+
   //Remove children of svg to eventually delete previous tiles
   svg.innerHTML = '';
 
-  console.log(this);
   var canvas = document.createElement('canvas');
   var context = canvas.getContext('2d');
 
-  setupSVG(this.width, this.height);
+  setupSVG(svg, this.width, this.height);
 
   canvas.width = this.width;
   canvas.height = this.height;
-  console.log(this.width+' and '+this.height);
+  console.log('Widht: '+this.width+', Height: '+this.height);
 
   //Draw image in context to be able to read pixels
   context.drawImage(this, 0, 0);
 
-  var mosaic = new Mosaic(this.width, this.height, context);
+  var mosaic = new Mosaic(this.width, this.height, context, svg);
 }
 
-function setupSVG(width, height) {
+//Set viewBox and width and height to allow responsive SVG
+function setupSVG(svg, width, height) {
   //Give to svg the same size as the image
   svg.setAttribute('viewBox', '0 0 '+width+' '+height);
   svg.setAttribute('width', '100%');
@@ -40,10 +45,12 @@ function setupSVG(width, height) {
 }
 
 //
-var Mosaic = function(width, height, context) {
+var Mosaic = function(width, height, context, svg) {
   //Find number of columns and rows
   this.columns = Math.floor(width/TILE_WIDTH);
   this.rows = Math.floor(height/TILE_HEIGHT);
+
+  this.svg = svg;
 
   console.log(['columns:', this.columns, 'rows:', this.rows].join(' '));
   this.context = context;
@@ -72,7 +79,7 @@ Mosaic.prototype.generateMosaicSequential = function() {
     }
 
     //append tiles for the row in one shot
-    svg.appendChild(docFrag);
+    this.svg.appendChild(docFrag);
   }
 };
 
@@ -92,7 +99,7 @@ Mosaic.prototype.createRow = function(a, row) {
     docFrag.appendChild(createTile(a[i], i*TILE_WIDTH, row*TILE_HEIGHT));
   }
 
-  svg.appendChild(docFrag);
+  this.svg.appendChild(docFrag);
 };
 
 
@@ -157,7 +164,7 @@ function createTile(rgbArray, i, j) {
   return getNode('ellipse', {cx: TILE_WIDTH/2+i, cy: TILE_HEIGHT/2+j, rx: TILE_WIDTH/2, ry: TILE_HEIGHT/2, fill: rgb});
 }
 
-//Get averages from a ImageData
+//Get averages from a Uint8ClampedArray for a tile
 function getAverages(data) {
   var sumRed = 0;
   var sumGreen = 0;

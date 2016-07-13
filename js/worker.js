@@ -1,4 +1,4 @@
-//Get averages of color RGB from a ImageData
+//Get averages of color RGB from a ImageData of a complete row
 function getAverages(data, tile, rows, columns) {
   var sumRed = 0;
   var sumGreen = 0;
@@ -10,10 +10,10 @@ function getAverages(data, tile, rows, columns) {
   var tileOffset = tile*TILE_WIDTH*4;
 
   // i column, j row
-  for(var j = 0; j < 16; j++) { //row 
-    var rowOffset = columns*16*4*j;
+  for(var j = 0; j < TILE_HEIGHT; j++) { //row 
+    var rowOffset = columns*TILE_WIDTH*4*j;
 
-    for(var i = 0; i < 16; i++) {
+    for(var i = 0; i < TILE_WIDTH; i++) {
       sumRed += data[rowOffset + i*4 + tileOffset];     
       sumGreen += data[rowOffset + i*4 + tileOffset + 1];
       sumBlue += data[rowOffset + i*4 + tileOffset + 2];
