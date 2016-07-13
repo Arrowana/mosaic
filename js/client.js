@@ -46,15 +46,11 @@ var Mosaic = function(width, height, context) {
   this.rows = Math.floor(height/TILE_HEIGHT);
 
   console.log(['columns:', this.columns, 'rows:', this.rows].join(' '));
-
   this.context = context;
-
-  //Tile row index
-  this.rowIndex = 0;
 
   var forceSequential = false;
   if(window.Worker && !forceSequential) {
-    this.processRow(this.rowIndex);
+    this.processImg(this.rowIndex);
   }
   else {
     this.generateMosaicSequential();
@@ -62,57 +58,61 @@ var Mosaic = function(width, height, context) {
   }
 };
 
-function showPerf() {
-    console.log('Finished mosaic generation in: '+(performance.now()-t0)+' ms');
-}
 
 //Loop over each tile to create the mosaic
 Mosaic.prototype.generateMosaicSequential = function() {
   for(var j = 0; j < this.rows; j++) {
+    var docFrag = document.createDocumentFragment();
+
     //Iterate over each column
     for(var i = 0; i < this.columns; i++) {
       var averages = getAverages(this.getTileData(i, j));
       console.log('Average tile: '+averages);
-      showPerf();
+      docFrag.appendChild(createTile(averages, i*TILE_WIDTH, j*TILE_HEIGHT));
     }
-  }
-};
 
-Mosaic.prototype.finishRow = function(tilesAverage) {
-  for(var i = 0; i < this.columns; i++) {
-    //svg.appendChild(createTile(averages, i, j));
-  }
-
-  this.rowIndex++;
-  if(this.rowIndex < this.rows) {
-    this.processRow(this.rowIndex);
-  }
-  else {
-    console.log('Mosaic computation finished');
-    console.log('Finished mosaic generation in: '+(performance.now()-t0)+' ms');
+    //append tiles for the row in one shot
+    svg.appendChild(docFrag);
   }
 };
 
 Mosaic.prototype.getTileData = function(column, row) {
-  return this.context.getImageData(column*TILE_WIDTH, row*TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT).data;
+  return this.context.getImageData(column*TILE_WIDTH, row*TILE_HEIGHT,
+    TILE_WIDTH, TILE_HEIGHT).data;
+}
+
+Mosaic.prototype.getRowData = function(row) {
+  return this.context.getImageData(0, row*TILE_HEIGHT, 
+    this.columns*TILE_WIDTH, TILE_HEIGHT).data;
 };
 
-Mosaic.prototype.processRow = function(rowIndex) {
+Mosaic.prototype.createRow = function(a, row) {
+  var docFrag = document.createDocumentFragment();
+  for(var i = 0; i < a.length; i++) {
+    docFrag.appendChild(createTile(a[i], i*TILE_WIDTH, row*TILE_HEIGHT));
+  }
+
+  svg.appendChild(docFrag);
+};
+
+
+Mosaic.prototype.processImg = function() {
   var maxWorkers = navigator.hardwareConcurrency || 4;
   var workers = [];
-  var workerIndex = 0;
-
-  var columnIndex = 0;
 
   var mosaic = this;
   var tilesAverage = [];
+
+  var row = 0;
   
   function runWorker(worker) {
     worker.onmessage = function(event) {
-      tilesAverage.push(event.data);
+      console.log(event.data);
+      mosaic.createRow(event.data.a, event.data.row);
 
-      columnIndex++;
-      if(columnIndex < mosaic.columns) {
+      row++;
+      if(row < mosaic.rows) {
+        console.log('work for:'+row);
         runWorker(worker);
       }
       else {
@@ -121,21 +121,25 @@ Mosaic.prototype.processRow = function(rowIndex) {
 
         //Returns if some worker are still running
         for(var i = 0; i < workers.length; i++) {
-          if (!workers[i].finished) {
+          if(!workers[i].finished) {
               return;
           }
         }
 
-        console.log('Computation on row '+rowIndex+' finished'); 
-        mosaic.finishRow(tilesAverage);
+        console.log('Computation on mosaic finished'); 
+        showPerf();
       }
     };
 
-    workerIndex++;
-
+    var payload = {};
     //Send payload to worker to do the computation
-    var tileData = mosaic.getTileData(rowIndex, columnIndex);
-    worker.postMessage(tileData);
+    payload.rowData = mosaic.getRowData(row);
+    payload.row = row; //To label
+    payload.columns = mosaic.columns;
+    payload.rows = mosaic.rows;
+
+    console.log('next row');
+    worker.postMessage(payload);
   }
 
   //Start as many workers as cores available
@@ -154,7 +158,7 @@ function createTile(rgbArray, i, j) {
 }
 
 //Get averages from a ImageData
-var getAverages = function(data) {
+function getAverages(data) {
   var sumRed = 0;
   var sumGreen = 0;
   var sumBlue = 0;
@@ -177,6 +181,10 @@ function getNode(n, v) {
   for (var p in v)
     n.setAttributeNS(null, p, v[p]);
   return n
+}
+
+function showPerf() {
+  console.log('Finished mosaic generation in: '+(performance.now()-t0)+' ms');
 }
 
 //Test functions
