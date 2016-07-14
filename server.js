@@ -25,11 +25,18 @@ http.createServer(function (req, res) {
     res.writeHead(200, {'Content-Type': 'text/html'});
     fs.createReadStream(dir + '/mosaic.html').pipe(res);
     return;
-  } else if (m = pathname.match(/^\/js\//)) {
+  } else if (m = pathname.match(/^\/(js|css)\//)) {
     var filename = dir + pathname;
     var stats = fs.existsSync(filename) && fs.statSync(filename);
     if (stats && stats.isFile()) {
-      res.writeHead(200, {'Content-Type' : 'application/javascript'});
+      var type = '';
+      if(m[1] == 'js') {  
+        type = 'application/javascript';
+      } else if(m[1] == 'css') {
+        type = 'text/css';
+      }
+
+      res.writeHead(200, {'Content-Type' : type});
       fs.createReadStream(filename).pipe(res);
       return;
     }

@@ -2,6 +2,8 @@
 
 */
 
+var forceSequential = false; //Can force sequential computation to compare
+
 document.addEventListener('DOMContentLoaded', load);
 
 function load() {
@@ -14,12 +16,7 @@ function load() {
 
 //Draw image in context to get pixels and generate mosaic
 function draw() {
-  t0 = performance.now();
-
   var svg = document.getElementById('output-svg');
-
-  //Remove children of svg to eventually delete previous tiles
-  svg.innerHTML = '';
 
   var canvas = document.createElement('canvas');
   var context = canvas.getContext('2d');
@@ -38,13 +35,16 @@ function draw() {
 
 //Set viewBox and width and height to allow responsive SVG
 function setupSVG(svg, width, height) {
+  //Remove children of svg to eventually tiles from the previous image
+  svg.innerHTML = '';
+
   //Give to svg the same size as the image
   svg.setAttribute('viewBox', '0 0 '+width+' '+height);
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
 }
 
-//
+//Mosaic class generate tiles and put them into the svg
 var Mosaic = function(width, height, context, svg) {
   //Find number of columns and rows
   this.columns = Math.floor(width/TILE_WIDTH);
@@ -55,7 +55,6 @@ var Mosaic = function(width, height, context, svg) {
   console.log(['columns:', this.columns, 'rows:', this.rows].join(' '));
   this.context = context;
 
-  var forceSequential = false;
   if(window.Worker && !forceSequential) {
     this.processImg(this.rowIndex);
   }
@@ -83,39 +82,42 @@ Mosaic.prototype.generateMosaicSequential = function() {
   }
 };
 
+//Get tile Uint8ClampedArray for row and column
 Mosaic.prototype.getTileData = function(column, row) {
   return this.context.getImageData(column*TILE_WIDTH, row*TILE_HEIGHT,
     TILE_WIDTH, TILE_HEIGHT).data;
 }
 
+//Get row Uint8ClampedArray for a whole row of tiles
 Mosaic.prototype.getRowData = function(row) {
   return this.context.getImageData(0, row*TILE_HEIGHT, 
     this.columns*TILE_WIDTH, TILE_HEIGHT).data;
 };
 
-Mosaic.prototype.createRow = function(a, row) {
+//Add row tiles into SVG given averages in an array
+Mosaic.prototype.createRow = function(averagesArray, row) {
   var docFrag = document.createDocumentFragment();
-  for(var i = 0; i < a.length; i++) {
-    docFrag.appendChild(createTile(a[i], i*TILE_WIDTH, row*TILE_HEIGHT));
+
+  for(var i = 0; i < averagesArray.length; i++) {
+    docFrag.appendChild(createTile(averagesArray[i], i*TILE_WIDTH, row*TILE_HEIGHT));
   }
 
   this.svg.appendChild(docFrag);
 };
 
 
+//Send U8IntClampArray of each row to a worker to compute the average color on each tile
 Mosaic.prototype.processImg = function() {
   var maxWorkers = navigator.hardwareConcurrency || 4;
   var workers = [];
 
   var mosaic = this;
-  var tilesAverage = [];
-
   var row = 0;
   
   function runWorker(worker) {
     worker.onmessage = function(event) {
       console.log(event.data);
-      mosaic.createRow(event.data.a, event.data.row);
+      mosaic.createRow(event.data.averagesArray, event.data.row);
 
       row++;
       if(row < mosaic.rows) {
@@ -124,17 +126,8 @@ Mosaic.prototype.processImg = function() {
       }
       else {
         worker.terminate();
-        worker.finished = true;
 
-        //Returns if some worker are still running
-        for(var i = 0; i < workers.length; i++) {
-          if(!workers[i].finished) {
-              return;
-          }
-        }
-
-        console.log('Computation on mosaic finished'); 
-        showPerf();
+        console.log('Worker terminates'); 
       }
     };
 
@@ -145,7 +138,7 @@ Mosaic.prototype.processImg = function() {
     payload.columns = mosaic.columns;
     payload.rows = mosaic.rows;
 
-    console.log('next row');
+    console.log('Send row' + row + ' data to worker');
     worker.postMessage(payload);
   }
 
